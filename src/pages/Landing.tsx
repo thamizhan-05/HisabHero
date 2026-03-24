@@ -42,7 +42,8 @@ const Landing = () => {
             </div>
             <span className="text-lg font-bold text-foreground tracking-tight">FinSight</span>
           </Link>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
             <Button variant="ghost" asChild>
               <Link to="/login">Sign In</Link>
             </Button>
