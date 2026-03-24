@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { TrendingUp, BarChart3, Shield, Lightbulb, ArrowRight, CheckCircle2 } from "lucide-react";
 
 const features = [
