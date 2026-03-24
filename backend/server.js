@@ -382,23 +382,83 @@ app.delete('/api/upload', async (req, res) => {
   res.json({ success: true });
 });
 
+// delete single transaction
+app.delete('/api/dashboard/transactions/:id', async (req, res) => {
+  const { id } = req.params;
+  let db = await getDbData();
+  db.transactions = (db.transactions || []).filter(t => t.id.toString() !== id);
+  db = recalculateDb(db);
+  await writeDbData(db);
+  res.json({ success: true, message: 'Transaction deleted' });
+});
+
+// GET /api/export
+app.get('/api/export', async (req, res) => {
+  const db = await getDbData();
+  const txs = db.transactions || [];
+  let csv = "Date,Description,Category,Amount,Type\n";
+  txs.forEach(tx => {
+    const desc = `"${(tx.description || '').replace(/"/g, '""')}"`;
+    const cat = `"${(tx.category || '').replace(/"/g, '""')}"`;
+    csv += `${tx.date},${desc},${cat},${tx.amount},${tx.type}\n`;
+  });
+  res.header('Content-Type', 'text/csv');
+  res.attachment('financial_data_export.csv');
+  return res.send(csv);
+});
+
 // ─── DASHBOARD ROUTES ─────────────────────────────────────────────────────────
+
+function getFilteredDb(db, filter) {
+  if (!filter || filter === 'all') return db;
+  const today = new Date();
+  
+  let startDate = null;
+  if (filter === 'this_month') {
+    startDate = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+  } else if (filter === 'last_3_months') {
+    startDate = new Date(today.getFullYear(), today.getMonth() - 2, 1).toISOString().split('T')[0];
+  } else if (filter === 'this_year') {
+    startDate = new Date(today.getFullYear(), 0, 1).toISOString().split('T')[0];
+  }
+  
+  if (!startDate) return db;
+  
+  const filteredTxs = (db.transactions || []).filter(tx => tx.date >= startDate);
+  
+  const tempDb = {
+    transactions: filteredTxs,
+    uploads: db.uploads,
+    stats: [], cashflow: { monthlyData: [], stats: [] },
+    expenses: { categories: [], monthlyTrend: [] },
+    runway: [], alerts: [], recommendations: [], revenueExpense: []
+  };
+  
+  return recalculateDb(tempDb);
+}
+
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
-app.get('/api/dashboard/stats', async (req, res) => { const db = await getDbData(); res.json(db.stats || []); });
-app.get('/api/dashboard/transactions', async (req, res) => { const db = await getDbData(); res.json(db.transactions || []); });
-app.get('/api/dashboard/cashflow', async (req, res) => { const db = await getDbData(); res.json(db.cashflow || {}); });
-app.get('/api/dashboard/expenses', async (req, res) => { const db = await getDbData(); res.json(db.expenses || {}); });
-app.get('/api/dashboard/runway', async (req, res) => { const db = await getDbData(); res.json(db.runway || []); });
-app.get('/api/dashboard/revenue-expense', async (req, res) => { const db = await getDbData(); res.json(db.revenueExpense || []); });
-app.get('/api/dashboard/alerts', async (req, res) => { const db = await getDbData(); res.json(db.alerts || []); });
+app.get('/api/dashboard/stats', async (req, res) => { const db = getFilteredDb(await getDbData(), req.query.filter); res.json(db.stats || []); });
+app.get('/api/dashboard/transactions', async (req, res) => { const db = getFilteredDb(await getDbData(), req.query.filter); res.json(db.transactions || []); });
+app.get('/api/dashboard/cashflow', async (req, res) => { const db = getFilteredDb(await getDbData(), req.query.filter); res.json(db.cashflow || {}); });
+app.get('/api/dashboard/expenses', async (req, res) => { const db = getFilteredDb(await getDbData(), req.query.filter); res.json(db.expenses || {}); });
+app.get('/api/dashboard/runway', async (req, res) => { const db = getFilteredDb(await getDbData(), req.query.filter); res.json(db.runway || []); });
+app.get('/api/dashboard/revenue-expense', async (req, res) => { const db = getFilteredDb(await getDbData(), req.query.filter); res.json(db.revenueExpense || []); });
+app.get('/api/dashboard/alerts', async (req, res) => { const db = getFilteredDb(await getDbData(), req.query.filter); res.json(db.alerts || []); });
 app.get('/api/ai/recommendations', async (req, res) => { const db = await getDbData(); res.json(db.recommendations || []); });
 app.get('/api/uploads', async (req, res) => { const db = await getDbData(); res.json(db.uploads || []); });
 
 app.get('/api/dashboard/health', async (req, res) => {
-  const db = await getDbData();
+  const db = getFilteredDb(await getDbData(), req.query.filter);
+  if (!db.transactions || db.transactions.length === 0) return res.json({ score: 0 });
+
   const marginStat = (db.stats || []).find(s => s.label === 'Net Margin');
   const margin = marginStat ? parseFloat(marginStat.value) : 0;
-  const score = db.transactions?.length ? Math.min(100, Math.max(0, Math.round(50 + margin))) : 0;
+
+  // Strict reality check: negative margin = 0 score. Positive margin scales 0→100.
+  // Formula: score = clamp(margin * 2, 0, 100)
+  // 50% margin → 100 score | 25% margin → 50 score | 0% or negative → 0 score
+  const score = Math.min(100, Math.max(0, Math.round(margin * 2)));
   res.json({ score });
 });
 

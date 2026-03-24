@@ -8,6 +8,7 @@ import Index from "./pages/Index.tsx";
 import CashFlow from "./pages/CashFlow.tsx";
 import Expenses from "./pages/Expenses.tsx";
 import AIRecommendations from "./pages/AIRecommendations.tsx";
+import Help from "./pages/Help.tsx";
 import Login from "./pages/Login.tsx";
 import NotFound from "./pages/NotFound.tsx";
 import { ProtectedRoute } from "./components/ProtectedRoute.tsx";
@@ -28,6 +29,7 @@ const App = () => (
             <Route path="/cash-flow" element={<CashFlow />} />
             <Route path="/expenses" element={<Expenses />} />
             <Route path="/ai" element={<AIRecommendations />} />
+            <Route path="/help" element={<Help />} />
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>

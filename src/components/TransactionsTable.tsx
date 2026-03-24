@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { ArrowUpDown } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
-import { fetchTransactions } from "@/lib/api";
+import { ArrowUpDown, Trash2, Loader2 } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { fetchTransactions, deleteTransaction } from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
 
 type Transaction = {
   id: number;
@@ -16,9 +17,23 @@ export function TransactionsTable() {
   const [sortKey, setSortKey] = useState<keyof Transaction>("date");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
   const { data: transactions, isLoading, error } = useQuery<Transaction[]>({
     queryKey: ['transactions'],
-    queryFn: fetchTransactions,
+    queryFn: () => fetchTransactions(),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: deleteTransaction,
+    onSuccess: () => {
+      queryClient.invalidateQueries();
+      toast({ title: "Transaction Deleted" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
   });
 
   const toggle = (key: keyof Transaction) => {
@@ -76,6 +91,7 @@ export function TransactionsTable() {
                   </span>
                 </th>
               ))}
+              <th className="w-10"></th>
             </tr>
           </thead>
           <tbody>
@@ -90,6 +106,19 @@ export function TransactionsTable() {
                 </td>
                 <td className={`py-3 px-4 font-mono font-medium ${tx.type === "income" ? "text-success" : "text-danger"}`}>
                   {tx.type === "income" ? "+" : "-"}₹{tx.amount.toLocaleString("en-IN")}
+                </td>
+                <td className="py-3 px-4 text-right">
+                  <button
+                    onClick={() => deleteMutation.mutate(tx.id)}
+                    disabled={deleteMutation.isPending}
+                    className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-colors disabled:opacity-50"
+                  >
+                    {deleteMutation.isPending && deleteMutation.variables === tx.id ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="w-4 h-4" />
+                    )}
+                  </button>
                 </td>
               </tr>
             ))}

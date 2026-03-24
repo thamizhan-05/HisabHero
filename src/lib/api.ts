@@ -1,49 +1,55 @@
 const API_BASE_URL = 'http://localhost:5000/api';
 
+const getFilterQuery = () => {
+  const params = new URLSearchParams(window.location.search);
+  const filter = params.get('filter');
+  return filter && filter !== 'all' ? `?filter=${filter}` : '';
+};
+
 export async function fetchHealth() {
-  const res = await fetch(`${API_BASE_URL}/dashboard/health`);
+  const res = await fetch(`${API_BASE_URL}/dashboard/health${getFilterQuery()}`);
   if (!res.ok) throw new Error('Failed to fetch health score');
   return res.json();
 }
 
 export async function fetchStats() {
-  const res = await fetch(`${API_BASE_URL}/dashboard/stats`);
+  const res = await fetch(`${API_BASE_URL}/dashboard/stats${getFilterQuery()}`);
   if (!res.ok) throw new Error('Failed to fetch stats');
   return res.json();
 }
 
 export async function fetchTransactions() {
-  const res = await fetch(`${API_BASE_URL}/dashboard/transactions`);
+  const res = await fetch(`${API_BASE_URL}/dashboard/transactions${getFilterQuery()}`);
   if (!res.ok) throw new Error('Failed to fetch transactions');
   return res.json();
 }
 
 export async function fetchCashFlow() {
-  const res = await fetch(`${API_BASE_URL}/dashboard/cashflow`);
+  const res = await fetch(`${API_BASE_URL}/dashboard/cashflow${getFilterQuery()}`);
   if (!res.ok) throw new Error('Failed to fetch cash flow data');
   return res.json();
 }
 
 export async function fetchExpenses() {
-  const res = await fetch(`${API_BASE_URL}/dashboard/expenses`);
+  const res = await fetch(`${API_BASE_URL}/dashboard/expenses${getFilterQuery()}`);
   if (!res.ok) throw new Error('Failed to fetch expenses data');
   return res.json();
 }
 
 export async function fetchRunway() {
-  const res = await fetch(`${API_BASE_URL}/dashboard/runway`);
+  const res = await fetch(`${API_BASE_URL}/dashboard/runway${getFilterQuery()}`);
   if (!res.ok) throw new Error('Failed to fetch runway data');
   return res.json();
 }
 
 export async function fetchRevenueExpense() {
-  const res = await fetch(`${API_BASE_URL}/dashboard/revenue-expense`);
+  const res = await fetch(`${API_BASE_URL}/dashboard/revenue-expense${getFilterQuery()}`);
   if (!res.ok) throw new Error('Failed to fetch revenue/expense data');
   return res.json();
 }
 
 export async function fetchAlerts() {
-  const res = await fetch(`${API_BASE_URL}/dashboard/alerts`);
+  const res = await fetch(`${API_BASE_URL}/dashboard/alerts${getFilterQuery()}`);
   if (!res.ok) throw new Error('Failed to fetch alerts');
   return res.json();
 }
@@ -80,5 +86,12 @@ export async function addTransaction(tx: { date: string; description: string; ca
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Failed to add transaction');
+  return data;
+}
+
+export async function deleteTransaction(id: string | number) {
+  const res = await fetch(`${API_BASE_URL}/dashboard/transactions/${id}`, { method: 'DELETE' });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to delete transaction');
   return data;
 }

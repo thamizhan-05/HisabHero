@@ -5,7 +5,7 @@ import { Upload, Menu, Trash2, History } from "lucide-react";
 import { useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { deleteAllData } from "@/lib/api";
 import { AddTransactionDialog } from "@/components/AddTransactionDialog";
 import { UploadHistoryPanel } from "@/components/UploadHistoryPanel";
@@ -19,6 +19,15 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [uploading, setUploading] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+  
+  const currentFilter = searchParams.get('filter') || 'all';
+
+  const handleFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setSearchParams({ filter: e.target.value });
+    // small delay allows URL to update before triggering refetched endpoints to read new window.location.search
+    setTimeout(() => queryClient.invalidateQueries(), 10);
+  };
 
   // For CSV Column Mapping modal
   const [mappingState, setMappingState] = useState<{
@@ -99,11 +108,34 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
               <h1 className="text-sm font-medium text-muted-foreground hidden sm:block">Financial Dashboard</h1>
             </div>
 
-            <div className="flex items-center gap-2 flex-wrap justify-end">
+            <div className="flex items-center gap-3 flex-wrap justify-end">
+              {/* Date Filter */}
+              <select
+                value={currentFilter}
+                onChange={handleFilterChange}
+                className="bg-transparent border border-border text-foreground text-sm rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer max-w-[130px]"
+              >
+                <option value="all">All Time</option>
+                <option value="this_month">This Month</option>
+                <option value="last_3_months">Last 3 Months</option>
+                <option value="this_year">This Year</option>
+              </select>
+
               <ThemeToggle />
 
               {/* Add Transaction */}
               <AddTransactionDialog />
+
+              {/* Export CSV */}
+              <a
+                href={`http://localhost:5000/api/export?filter=${currentFilter}`}
+                download
+                className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-500/10 text-blue-500 text-sm font-medium hover:bg-blue-500/20 transition-colors"
+                title="Export Filtered Data to CSV"
+              >
+                <Upload className="w-4 h-4 rotate-180" />
+                <span className="hidden sm:inline">Export</span>
+              </a>
 
               {/* Upload CSV */}
               <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept=".csv" className="hidden" />

@@ -1,4 +1,4 @@
-import { LayoutDashboard, TrendingUp, PieChart, Lightbulb } from "lucide-react";
+import { LayoutDashboard, TrendingUp, PieChart, Lightbulb, HelpCircle } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import {
@@ -17,6 +17,7 @@ const items = [
   { title: "Cash Flow", url: "/cash-flow", icon: TrendingUp },
   { title: "Expense Analysis", url: "/expenses", icon: PieChart },
   { title: "AI Recommendations", url: "/ai", icon: Lightbulb },
+  { title: "Help", url: "/help", icon: HelpCircle },
 ];
 
 export function AppSidebar() {
