@@ -10,6 +10,15 @@ import multer from 'multer';
 import csv from 'csv-parser';
 import { Readable } from 'stream';
 
+import connectDB from './config/db.js';
+import User from './models/User.js';
+import Transaction from './models/Transaction.js';
+import Upload from './models/Upload.js';
+import { PDFParse } from 'pdf-parse';
+import Tesseract from 'tesseract.js';
+
+
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -17,11 +26,11 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 const MAX_ROWS = 5000; // [E] Row limit guard
 
+// ─── Connect to MongoDB ───
+connectDB();
+
 app.use(cors());
 app.use(express.json());
-
-const DATA_FILE = path.join(__dirname, 'data.json');
-const USERS_FILE = path.join(__dirname, 'users.json');
 
 const EMPTY_DB = {
   stats: [], transactions: [], uploads: [],
@@ -30,21 +39,36 @@ const EMPTY_DB = {
   runway: [], alerts: [], recommendations: [], revenueExpense: []
 };
 
-// ─── DB Helpers ───────────────────────────────────────────────────────────────
+// ─── DB Helpers (Adapted for MongoDB) ─────────────────────────────────────────
 async function getDbData() {
-  try { return JSON.parse(await fs.readFile(DATA_FILE, 'utf-8')); }
-  catch { return { ...EMPTY_DB }; }
+  try {
+    // Fetch all from Mongo
+    const rawTransactions = await Transaction.find({}).lean();
+    const uploads = await Upload.find({}).lean();
+    
+    // Map _id to id to avoid breaking frontend/calculations iterating with `id`
+    const transactions = rawTransactions.map(t => ({
+      ...t,
+      id: t._id.toString()
+    }));
+
+    const db = { ...EMPTY_DB, transactions, uploads };
+    return recalculateDb(db);
+  } catch (err) {
+    console.error('getDbData MongoDB fetch error:', err);
+    return { ...EMPTY_DB };
+  }
 }
+
 async function writeDbData(data) {
-  await fs.writeFile(DATA_FILE, JSON.stringify(data, null, 2), 'utf-8');
+  // Not strictly used since writes will be done directly via mongoose queries in API routes Node hooks configs.
 }
+
 async function getUsers() {
-  try { return JSON.parse(await fs.readFile(USERS_FILE, 'utf-8')); }
+  try { return await User.find({}).lean(); }
   catch { return []; }
 }
-async function writeUsers(data) {
-  await fs.writeFile(USERS_FILE, JSON.stringify(data, null, 2), 'utf-8');
-}
+
 
 // ─── [A] Smart Column Detection ───────────────────────────────────────────────
 const ALIASES = {
@@ -269,22 +293,34 @@ function recalculateDb(db) {
 app.post('/api/auth/signup', async (req, res) => {
   const { fullName, email, password, companyName } = req.body;
   if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
-  const users = await getUsers();
-  if (users.find(u => u.email === email)) return res.status(400).json({ error: 'User already exists' });
-  const newUser = { id: Date.now().toString(), fullName, email, password, companyName };
-  users.push(newUser);
-  await writeUsers(users);
-  res.json({ token: `mock-jwt-${newUser.id}`, user: { email, fullName, companyName } });
+  
+  try {
+    const existingUser = await User.findOne({ email });
+    if (existingUser) return res.status(400).json({ error: 'User already exists' });
+    
+    const newUser = new User({ fullName, email, password, companyName });
+    await newUser.save();
+    
+    res.json({ token: `mock-jwt-${newUser._id}`, user: { email, fullName, companyName } });
+  } catch (err) {
+    res.status(500).json({ error: 'Fallback Error: ' + err.message });
+  }
 });
 
 app.post('/api/auth/login', async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
-  const users = await getUsers();
-  const user = users.find(u => u.email === email && u.password === password);
-  if (!user) return res.status(401).json({ error: 'Invalid email or password' });
-  res.json({ token: `mock-jwt-${user.id}`, user: { email: user.email, fullName: user.fullName, companyName: user.companyName } });
+  
+  try {
+    const user = await User.findOne({ email, password });
+    if (!user) return res.status(401).json({ error: 'Invalid email or password' });
+    
+    res.json({ token: `mock-jwt-${user._id}`, user: { email: user.email, fullName: user.fullName, companyName: user.companyName } });
+  } catch (err) {
+    res.status(500).json({ error: 'Fallback Error: ' + err.message });
+  }
 });
+
 
 // ─── CSV UPLOAD ───────────────────────────────────────────────────────────────
 const upload = multer({ storage: multer.memoryStorage() });
@@ -292,80 +328,74 @@ const upload = multer({ storage: multer.memoryStorage() });
 app.post('/api/upload', upload.single('file'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
 
-  // [PDF Processing via AI]
+  // [PDF Processing via Local Heuristics]
   if (req.file.originalname.toLowerCase().endsWith('.pdf')) {
     try {
       if (!process.env.GEMINI_API_KEY) {
         return res.status(500).json({ error: 'GEMINI_API_KEY is not set in the backend environment.' });
       }
 
+      console.log(`[PDF] Uploaded file: ${req.file.originalname}. Sending direct PDF buffer to Gemini AI...`);
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
       
       const pdfBase64 = req.file.buffer.toString('base64');
-      const inlinePdf = {
-        inlineData: {
-          data: pdfBase64,
-          mimeType: 'application/pdf'
-        }
+      const inlineData = {
+        data: pdfBase64,
+        mimeType: 'application/pdf'
       };
 
       const prompt = `
 You are a precise financial data extraction assistant.
-You have been provided with a bank statement PDF. Note that the first few pages may be cover letters, relationship summaries, or irrelevant text. 
+You have been provided with a bank statement PDF. The first few pages may be cover letters, relationship summaries, or irrelevant text. 
 
-Please IGNORE all non-tabular, irrelevant data and focus ONLY on the actual transaction tables (Date, Description/Reference, Withdrawals, Deposits, Balance).
+Please IGNORE all non-tabular, irrelevant data and focus ONLY on the actual transaction tables (Date, Description, Withdrawals, Deposits, Balance).
 
 Extract the transaction data and return strictly a raw JSON array of objects with the exact following keys:
 - "date": Date of transaction in YYYY-MM-DD format
-- "description": Description or narration or reference of the transaction
-- "category": Categorize the transaction into a single concise word or short phrase (e.g. "Rent", "Groceries", "Food", "Salary", "Transfer", "Utility", "Other") based on the description
+- "description": Description or narration, picking up UPI IDs, merchant details, or transaction text.
+- "category": Categorize the transaction into a single concise word or short phrase (e.g. "Rent", "Groceries", "Food", "Salary", "Shopping", "Utility", "UPI Transfer", "Cash", "Other") based on the description
 - "amount": The numeric amount of the transaction as a positive float only
 - "type": "income" (for credits/deposits) or "expense" (for debits/withdrawals)
 
-Do not include any markdown wrap like \`\`\`json, just output the raw JSON array.
+Do not include any markdown wrap like \`\`\`json, just output the raw JSON array. If there are no structured transactions found, output an empty [] array.
       `;
 
       const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
-        contents: [inlinePdf, prompt]
+        contents: [
+            { inlineData },
+            prompt
+        ]
       });
 
       let jsonText = response.text || '';
       jsonText = jsonText.replace(/^```json/, '').replace(/^```/, '').replace(/```$/, '').trim();
 
-      let extractedTransactions;
+      let validRows = [];
       try {
-        extractedTransactions = JSON.parse(jsonText);
+        validRows = JSON.parse(jsonText).filter(r => r.amount > 0);
       } catch (e) {
-        throw new Error('Failed to parse AI response as JSON. AI Response: ' + jsonText.substring(0, 100) + '...');
+        console.error('Failed to parse AI response as JSON. AI Response: ', jsonText.substring(0, 100));
+        return res.status(422).json({ error: 'AI failed to extract structured JSON data from this document.' });
       }
 
-      const validRows = extractedTransactions.filter(r => r.amount > 0);
-      if (validRows.length === 0) return res.status(400).json({ error: 'No valid transactions found in PDF.' });
+      console.log(`[PDF] Matches found via AI extraction: ${validRows.length}`);
 
-      let db = await getDbData();
+      if (validRows.length === 0) {
+         return res.status(422).json({ error: 'No structured transactions detected in the PDF. Make sure tabular data exists.' });
+      }
+
       const uploadId = Date.now().toString();
-      if (!db.uploads) db.uploads = [];
-      db.uploads.push({
-        id: uploadId,
-        filename: req.file.originalname,
-        uploadedAt: new Date().toISOString(),
-        rowCount: validRows.length
-      });
+      const uploadEntry = new Upload({ uploadId, filename: req.file.originalname, rowCount: validRows.length });
+      await uploadEntry.save();
 
-      const existingIds = new Set((db.transactions || []).map(t => t.uploadId));
-      db.transactions = [
-        ...(db.transactions || []).filter(t => t.uploadId !== uploadId),
-        ...validRows.map((r, i) => ({ id: Date.now() + i, uploadId, ...r }))
-      ];
-
-      db = recalculateDb(db);
-      await writeDbData(db);
+      const transactionsToInsert = validRows.map(r => ({ uploadId, ...r }));
+      await Transaction.insertMany(transactionsToInsert);
 
       return res.json({ success: true, imported: validRows.length, skipped: 0, uploadId });
     } catch (err) {
       console.error(err);
-      return res.status(500).json({ error: 'Failed to process PDF: ' + err.message });
+      return res.status(500).json({ error: 'Failed to parse PDF local heuristically: ' + err.message });
     }
   }
 
@@ -415,27 +445,24 @@ Do not include any markdown wrap like \`\`\`json, just output the raw JSON array
         return res.status(400).json({ error: 'No valid rows found in CSV. Ensure Amount column has numeric values > 0.' });
       }
 
-      let db = await getDbData();
-
-      // [B] Track upload history
-      if (!db.uploads) db.uploads = [];
       const uploadId = Date.now().toString();
-      db.uploads.push({
-        id: uploadId,
+      const uploadEntry = new Upload({
+        uploadId,
         filename: req.file.originalname,
         uploadedAt: new Date().toISOString(),
         rowCount: validRows.length
       });
+      await uploadEntry.save();
 
-      // Append new transactions (preserve existing ones from other uploads)
-      const existingIds = new Set((db.transactions || []).map(t => t.uploadId));
-      db.transactions = [
-        ...(db.transactions || []).filter(t => t.uploadId !== uploadId),
-        ...validRows.map((r, i) => ({ id: Date.now() + i, uploadId, ...r }))
-      ];
-
-      db = recalculateDb(db);
-      await writeDbData(db);
+      const transactionsToInsert = validRows.map(r => ({
+        uploadId,
+        date: r.date,
+        description: r.description,
+        category: r.category || 'Other',
+        amount: r.amount,
+        type: r.type || 'expense'
+      }));
+      await Transaction.insertMany(transactionsToInsert);
 
       res.json({
         success: true,
@@ -450,28 +477,36 @@ Do not include any markdown wrap like \`\`\`json, just output the raw JSON array
 // Delete a specific upload by ID (removes its transactions, recalculates)
 app.delete('/api/upload/:id', async (req, res) => {
   const { id } = req.params;
-  let db = await getDbData();
-  db.uploads = (db.uploads || []).filter(u => u.id !== id);
-  db.transactions = (db.transactions || []).filter(t => t.uploadId !== id);
-  db = recalculateDb(db);
-  await writeDbData(db);
-  res.json({ success: true });
+  try {
+    await Upload.deleteOne({ uploadId: id });
+    await Transaction.deleteMany({ uploadId: id });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Delete error: ' + err.message });
+  }
 });
 
 // Delete ALL data
 app.delete('/api/upload', async (req, res) => {
-  await writeDbData({ ...EMPTY_DB });
-  res.json({ success: true });
+  try {
+    await Upload.deleteMany({});
+    await Transaction.deleteMany({});
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Delete error: ' + err.message });
+  }
 });
 
 // delete single transaction
 app.delete('/api/dashboard/transactions/:id', async (req, res) => {
   const { id } = req.params;
-  let db = await getDbData();
-  db.transactions = (db.transactions || []).filter(t => t.id.toString() !== id);
-  db = recalculateDb(db);
-  await writeDbData(db);
-  res.json({ success: true, message: 'Transaction deleted' });
+  try {
+    // Try to delete by mapped id string or _id MongoDB objectId
+    await Transaction.deleteOne({ _id: id });
+    res.json({ success: true, message: 'Transaction deleted' });
+  } catch (err) {
+    res.status(500).json({ error: 'Delete error: ' + err.message });
+  }
 });
 
 // GET /api/export
@@ -584,17 +619,26 @@ app.get('/api/dashboard/health', async (req, res) => {
   res.json({ score });
 });
 
-// Add a single transaction manually
 app.post('/api/dashboard/transactions', async (req, res) => {
   const { date, description, category, amount, type } = req.body;
   if (!amount || !date) return res.status(400).json({ error: 'date and amount are required' });
 
-  let db = await getDbData();
-  const newTx = { id: Date.now(), uploadId: 'manual', date, description, category: category || 'Other', amount: parseFloat(amount), type: type || 'expense' };
-  db.transactions = [...(db.transactions || []), newTx];
-  db = recalculateDb(db);
-  await writeDbData(db);
-  res.status(201).json(newTx);
+  try {
+    const txModel = new Transaction({
+      uploadId: 'manual',
+      date,
+      description,
+      category: category || 'Other',
+      amount: parseFloat(amount),
+      type: type || 'expense'
+    });
+    await txModel.save();
+    
+    const returnTx = { ...txModel.toObject(), id: txModel._id.toString() };
+    res.status(201).json(returnTx);
+  } catch (err) {
+    res.status(500).json({ error: 'Save error: ' + err.message });
+  }
 });
 
 app.listen(PORT, () => {

@@ -39,7 +39,7 @@ const formatText = (text: string) => {
 export function FloatingAIBot() {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
-    { role: "ai", content: "Hi! I'm FinInsight AI, your financial assistant. How can I help you analyze your data today?" }
+    { role: "ai", content: "Hi! I'm Hero Bot, your financial assistant. How can I help you analyze your data today?" }
   ]);
   const [input, setInput] = useState("");
   const [isPending, setIsPending] = useState(false);
@@ -103,7 +103,7 @@ export function FloatingAIBot() {
                 <Bot className="w-5 h-5 text-primary-foreground" />
               </div>
               <div>
-                <h3 className="text-sm font-bold tracking-tight">FinInsight Assistant</h3>
+                <h3 className="text-sm font-bold tracking-tight">Hero Bot</h3>
                 <p className="text-[10px] opacity-80 font-medium">AI Financial Analyst</p>
               </div>
             </div>
