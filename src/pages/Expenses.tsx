@@ -77,22 +77,27 @@ export default function Expenses() {
           <Card className="glass-card border-border/50">
             <CardHeader><CardTitle className="text-base">Monthly Expense Trend</CardTitle></CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={240}>
-                <BarChart data={monthlyTrend}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(220 14% 18%)" />
-                  <XAxis dataKey="month" stroke="hsl(215 15% 55%)" fontSize={12} />
-                  <YAxis stroke="hsl(215 15% 55%)" fontSize={12} tickFormatter={(v) => `₹${v / 1000}k`} />
-                  <Tooltip
-                    contentStyle={{ background: "hsl(220 18% 13%)", border: "1px solid hsl(220 14% 18%)", borderRadius: 8 }}
-                    itemStyle={{ color: "hsl(210 20% 92%)" }}
-                    labelStyle={{ color: "hsl(210 20% 92%)" }}
-                  />
-                  <Bar dataKey="payroll" stackId="a" fill="hsl(160 84% 39%)" name="Payroll" />
-                  <Bar dataKey="rent" stackId="a" fill="hsl(200 80% 50%)" name="Rent" />
-                  <Bar dataKey="marketing" stackId="a" fill="hsl(38 92% 50%)" name="Marketing" />
-                  <Bar dataKey="other" stackId="a" fill="hsl(280 70% 55%)" radius={[4, 4, 0, 0]} name="Other" />
-                </BarChart>
-              </ResponsiveContainer>
+              {monthlyTrend.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-[240px] text-center text-muted-foreground">
+                  <p className="text-sm">No monthly expense data yet.</p>
+                  <p className="text-xs mt-1 opacity-60">Upload a statement to see the trend.</p>
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height={240}>
+                  <BarChart data={monthlyTrend} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(220 14% 18%)" />
+                    <XAxis dataKey="month" stroke="hsl(215 15% 55%)" fontSize={12} />
+                    <YAxis stroke="hsl(215 15% 55%)" fontSize={12} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
+                    <Tooltip
+                      contentStyle={{ background: "hsl(220 18% 13%)", border: "1px solid hsl(220 14% 18%)", borderRadius: 8 }}
+                      itemStyle={{ color: "hsl(210 20% 92%)" }}
+                      labelStyle={{ color: "hsl(210 20% 92%)" }}
+                      formatter={(v: number) => `₹${v.toLocaleString("en-IN")}`}
+                    />
+                    <Bar dataKey="total" fill="hsl(160 84% 39%)" radius={[4, 4, 0, 0]} name="Total Expenses" />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
             </CardContent>
           </Card>
         </div>

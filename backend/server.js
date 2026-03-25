@@ -558,7 +558,22 @@ app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 app.get('/api/dashboard/stats', async (req, res) => { const db = getFilteredDb(await getDbData(), req.query.filter); res.json(db.stats || []); });
 app.get('/api/dashboard/transactions', async (req, res) => { const db = getFilteredDb(await getDbData(), req.query.filter); res.json(db.transactions || []); });
 app.get('/api/dashboard/cashflow', async (req, res) => { const db = getFilteredDb(await getDbData(), req.query.filter); res.json(db.cashflow || {}); });
-app.get('/api/dashboard/expenses', async (req, res) => { const db = getFilteredDb(await getDbData(), req.query.filter); res.json(db.expenses || {}); });
+app.get('/api/dashboard/expenses', async (req, res) => {
+  const db = getFilteredDb(await getDbData(), req.query.filter);
+  const expenses = db.expenses || {};
+  const txs = db.transactions || [];
+  const monthExpMap = {};
+  txs.filter(tx => tx.type === 'expense').forEach(tx => {
+    const m = (tx.date || '').slice(0, 7) || 'Unknown';
+    if (!monthExpMap[m]) monthExpMap[m] = { total: 0 };
+    monthExpMap[m].total += tx.amount;
+  });
+  expenses.monthlyTrend = Object.entries(monthExpMap)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .slice(-12)
+    .map(([m, v]) => ({ month: m.slice(5), total: Math.round(v.total) }));
+  res.json(expenses);
+});
 app.get('/api/dashboard/runway', async (req, res) => { const db = getFilteredDb(await getDbData(), req.query.filter); res.json(db.runway || []); });
 app.get('/api/dashboard/revenue-expense', async (req, res) => { const db = getFilteredDb(await getDbData(), req.query.filter); res.json(db.revenueExpense || []); });
 app.get('/api/dashboard/alerts', async (req, res) => { const db = getFilteredDb(await getDbData(), req.query.filter); res.json(db.alerts || []); });
@@ -572,12 +587,12 @@ app.post('/api/ai/chat', async (req, res) => {
     
     // Safely summarize context to ensure we fit in context window and omit heavy transaction lists
     const summaryContext = {
-      stats: context.stats,
-      revenueExpense: context.revenueExpense,
-      runway: context.runway,
-      runwayMonths: context.runwayMonths,
-      alerts: context.alerts,
-      expenses: context.expenses
+      stats: context.stats || {},
+      revenueExpense: Array.isArray(context.revenueExpense) ? context.revenueExpense.slice(-30) : [],
+      runway: Array.isArray(context.runway) ? context.runway.slice(-12) : [],
+      runwayMonths: context.runwayMonths || 0,
+      alerts: Array.isArray(context.alerts) ? context.alerts.slice(0, 5) : [],
+      expenses: Array.isArray(context.expenses) ? context.expenses.slice(0, 75) : []
     };
 
     const prompt = `

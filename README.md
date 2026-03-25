@@ -10,9 +10,11 @@ It allows business owners to seamlessly track their cash flow, analyze expense a
 
 1. **PDF Bank Statement AI Processing:** Upload massive, unformatted bank statement PDFs seamlessly. Our robust **Google Gemini 2.5 Flash** integrated pipeline instantly reads the layout, extracts tabular transactional data exactly, categorizes it, and visualizes the results into your application.
 2. **Context-Aware Hero Bot:** Ask your data questions. HisabHero features the **Hero Bot**, a floating, global AI Chatbot that natively understands your *live* dashboard context—it can tell you your current runway, your biggest expense categories, and automatically flag financial anomalies.
-3. **Advanced Visualizations:** Track the health of your SME visually using detailed cash-flow charts, pie charts, metric read-outs, and a global "Business Health Score".
-4. **CSV Bulk Uploading & Smart Mapping:** Map and ingest hundreds of legacy transaction records instantly.
-5. **Secure Cloud Persistence:** Completely powered by **MongoDB Atlas** with encrypted passwords (bcrypt) and JWT user sessions!
+3. **AI Executive Reports (Print to PDF):** Instantly generate a comprehensive, structured financial document summarizing your entire live data via a single click. Print flawlessly crafted multi-page PDFs mapping your specific expense categories and runway forecasts securely using isolated print windows.
+4. **Advanced Visualizations:** Track the health of your SME visually using detailed cash-flow charts, pie charts, metric read-outs, and a global "Business Health Score".
+5. **CSV Bulk Uploading & Smart Mapping:** Map and ingest hundreds of legacy transaction records instantly.
+6. **Secure Cloud Persistence:** Completely powered by **MongoDB Atlas** with encrypted passwords (bcrypt) and JWT user sessions!
+7. **Bulletproof Architecture:** Hardened with strict React **Error Boundaries** to prevent cascading dashboard failure, integrated alongside highly tailored prompt extraction logic securing Gemini's token limits natively.
 
 ---
 

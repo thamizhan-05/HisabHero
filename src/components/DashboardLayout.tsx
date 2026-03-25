@@ -11,6 +11,7 @@ import { AddTransactionDialog } from "@/components/AddTransactionDialog";
 import { UploadHistoryPanel } from "@/components/UploadHistoryPanel";
 import { CsvMappingModal } from "@/components/CsvMappingModal";
 import { FloatingAIBot } from "@/components/FloatingAIBot";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -177,7 +178,9 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
             </div>
           </header>
 
-          <main className="flex-1 p-6 overflow-auto">{children}</main>
+          <main className="flex-1 p-6 overflow-auto">
+            <ErrorBoundary>{children}</ErrorBoundary>
+          </main>
         </div>
       </div>
 
