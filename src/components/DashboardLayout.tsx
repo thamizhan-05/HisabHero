@@ -21,6 +21,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [uploading, setUploading] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
   
   const currentFilter = searchParams.get('filter') || 'all';
@@ -84,15 +85,17 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   };
 
   const handleDeleteAll = async () => {
-    if (!confirm("Remove ALL uploaded data? This will clear the entire dashboard.")) return;
     setDeleting(true);
+    setConfirmDelete(false);
     try {
-      await deleteAllData();
-      toast({ title: "🗑️ Cleared", description: "All data removed." });
-      await queryClient.invalidateQueries();
-    } catch {
-      toast({ title: "Error", description: "Failed to clear data.", variant: "destructive" });
-    } finally {
+      const res = await fetch('http://localhost:5000/api/upload', { method: 'DELETE' });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || `Server error: ${res.status}`);
+      }
+      window.location.reload();
+    } catch (err: any) {
+      toast({ title: "Error deleting data", description: err.message, variant: "destructive" });
       setDeleting(false);
     }
   };
@@ -160,14 +163,33 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
               </button>
 
               {/* Remove All */}
-              <button
-                onClick={handleDeleteAll}
-                disabled={deleting}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg bg-destructive/10 text-destructive text-sm font-medium hover:bg-destructive/20 transition-colors disabled:opacity-50"
-                title="Remove all data"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
+              {confirmDelete ? (
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-destructive/20 border border-destructive/40 text-sm">
+                  <span className="text-destructive font-medium text-xs">Delete all?</span>
+                  <button
+                    onClick={handleDeleteAll}
+                    disabled={deleting}
+                    className="px-2 py-0.5 rounded bg-destructive text-white text-xs font-bold hover:bg-destructive/80 disabled:opacity-50"
+                  >
+                    {deleting ? "Deleting..." : "Yes, Delete"}
+                  </button>
+                  <button
+                    onClick={() => setConfirmDelete(false)}
+                    className="px-2 py-0.5 rounded bg-muted text-muted-foreground text-xs hover:bg-muted/80"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setConfirmDelete(true)}
+                  disabled={deleting}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg bg-destructive/10 text-destructive text-sm font-medium hover:bg-destructive/20 transition-colors disabled:opacity-50"
+                  title="Remove all data"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              )}
 
               <button
                 onClick={handleLogout}

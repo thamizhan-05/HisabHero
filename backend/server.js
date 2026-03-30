@@ -29,8 +29,18 @@ const MAX_ROWS = 5000; // [E] Row limit guard
 // ─── Connect to MongoDB ───
 connectDB();
 
-app.use(cors());
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(express.json());
+
+// Add simple request logging
+app.use((req, res, next) => {
+  console.log(`[${new Date().toLocaleTimeString()}] ${req.method} ${req.url}`);
+  next();
+});
 
 const EMPTY_DB = {
   stats: [], transactions: [], uploads: [],
@@ -44,12 +54,18 @@ async function getDbData() {
   try {
     // Fetch all from Mongo
     const rawTransactions = await Transaction.find({}).lean();
-    const uploads = await Upload.find({}).lean();
+    const rawUploads = await Upload.find({}).lean();
     
     // Map _id to id to avoid breaking frontend/calculations iterating with `id`
     const transactions = rawTransactions.map(t => ({
       ...t,
       id: t._id.toString()
+    }));
+    
+    const uploads = rawUploads.map(u => ({
+      ...u,
+      id: u._id.toString(),
+      uploadId: u.uploadId || u._id.toString() // Ensure uploadId fallback is safe
     }));
 
     const db = { ...EMPTY_DB, transactions, uploads };
@@ -474,25 +490,43 @@ Do not include any markdown wrap like \`\`\`json, just output the raw JSON array
     .on('error', err => res.status(500).json({ error: `CSV parse error: ${err.message}` }));
 });
 
-// Delete a specific upload by ID (removes its transactions, recalculates)
-app.delete('/api/upload/:id', async (req, res) => {
-  const { id } = req.params;
+// ⚠️ IMPORTANT: Delete ALL must be declared BEFORE /:id route or Express will treat 'all' as an :id param
+// Delete ALL data
+app.delete('/api/upload', async (req, res) => {
   try {
-    await Upload.deleteOne({ uploadId: id });
-    await Transaction.deleteMany({ uploadId: id });
+    console.log('[DELETE ALL] Clearing all uploads and transactions...');
+    const uploadResult = await Upload.deleteMany({});
+    const txResult = await Transaction.deleteMany({});
+    console.log(`[DELETE ALL] Removed ${uploadResult.deletedCount} uploads, ${txResult.deletedCount} transactions.`);
     res.json({ success: true });
   } catch (err) {
+    console.error('[DELETE ALL] Error:', err.message);
     res.status(500).json({ error: 'Delete error: ' + err.message });
   }
 });
 
-// Delete ALL data
-app.delete('/api/upload', async (req, res) => {
+// Delete a specific upload by ID — matches by uploadId string OR MongoDB _id
+app.delete('/api/upload/:id', async (req, res) => {
+  const { id } = req.params;
+  console.log(`[DELETE UPLOAD] Requested id: ${id}`);
   try {
-    await Upload.deleteMany({});
-    await Transaction.deleteMany({});
+    const { Types: { ObjectId } } = await import('mongoose');
+    // Try to find upload by uploadId string first, then by _id
+    let upload = await Upload.findOne({ uploadId: id });
+    if (!upload && ObjectId.isValid(id)) {
+      upload = await Upload.findById(id);
+    }
+    if (!upload) {
+      console.warn(`[DELETE UPLOAD] No upload found for id: ${id}`);
+      return res.status(404).json({ error: 'Upload not found.' });
+    }
+    const uploadIdStr = upload.uploadId;
+    await Upload.deleteOne({ _id: upload._id });
+    const txResult = await Transaction.deleteMany({ uploadId: uploadIdStr });
+    console.log(`[DELETE UPLOAD] Deleted upload "${upload.filename}", ${txResult.deletedCount} transactions removed.`);
     res.json({ success: true });
   } catch (err) {
+    console.error('[DELETE UPLOAD] Error:', err.message);
     res.status(500).json({ error: 'Delete error: ' + err.message });
   }
 });

@@ -53,32 +53,44 @@ const Landing = () => {
       </nav>
 
       {/* Hero */}
-      <section className="pt-32 pb-20 px-6">
-        <div className="max-w-4xl mx-auto text-center space-y-6">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium border border-primary/20">
+      <section
+        className="pt-32 pb-24 px-6 relative overflow-hidden"
+        style={{
+          backgroundImage: "url('/landing-bg.png')",
+          backgroundSize: "cover",
+          backgroundPosition: "center top",
+          backgroundRepeat: "no-repeat",
+        }}
+      >
+        {/* Dark overlay so text stays readable */}
+        <div className="absolute inset-0 bg-black/60 backdrop-blur-[1px]" />
+
+        <div className="relative z-10 max-w-4xl mx-auto text-center space-y-6">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/20 text-primary text-xs font-medium border border-primary/30 backdrop-blur-sm">
             <Lightbulb className="w-3 h-3" />
             AI-Powered Financial Intelligence
           </div>
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-foreground leading-tight tracking-tight">
+          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-white leading-tight tracking-tight drop-shadow-lg">
             Your SME finances,
             <br />
             <span className="text-primary">crystal clear.</span>
           </h1>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed">
+          <p className="text-lg text-white/80 max-w-2xl mx-auto leading-relaxed drop-shadow">
             HisabHero gives small and medium businesses a powerful dashboard to track cash flow, detect anomalies, and get AI-driven recommendations — all in one place.
           </p>
           <div className="flex items-center justify-center gap-4 pt-4">
-            <Button size="lg" asChild className="gap-2">
+            <Button size="lg" asChild className="gap-2 shadow-lg shadow-primary/30">
               <Link to="/login?signup=true">
                 Start Free <ArrowRight className="w-4 h-4" />
               </Link>
             </Button>
-            <Button size="lg" variant="outline" asChild>
+            <Button size="lg" variant="outline" asChild className="border-white/30 text-white hover:bg-white/10 backdrop-blur-sm">
               <Link to="/login">Sign In</Link>
             </Button>
           </div>
         </div>
       </section>
+
 
       {/* Features */}
       <section className="py-20 px-6 border-t border-border/30">
