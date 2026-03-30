@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { X, ArrowRight } from "lucide-react";
+import { API_BASE_URL } from "@/lib/api";
 
 interface MappingModalProps {
   headers: string[];
@@ -39,7 +40,7 @@ export function CsvMappingModal({ headers, detectedMapping, fileFormData, onClos
 
     setLoading(true);
     // Re-upload with the confirmed mapping as query params
-    const url = new URL("http://localhost:5000/api/upload");
+    const url = new URL(`${API_BASE_URL}/upload`);
     Object.entries(mapping).forEach(([k, v]) => { if (v) url.searchParams.set(k, v); });
     url.searchParams.set("mappingConfirmed", "true");
 

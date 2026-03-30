@@ -2,9 +2,10 @@ import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { X, FileText, Trash2, Loader2 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import { API_BASE_URL } from "@/lib/api";
 
 async function fetchUploads() {
-  const res = await fetch("http://localhost:5000/api/uploads");
+  const res = await fetch(`${API_BASE_URL}/uploads`);
   if (!res.ok) throw new Error("Failed to fetch uploads");
   return res.json();
 }
@@ -20,7 +21,7 @@ export function UploadHistoryPanel({ onClose }: { onClose: () => void }) {
     setConfirmId(null);
     try {
       // Try deleting by MongoDB _id first
-      const res = await fetch(`http://localhost:5000/api/upload/${mongoId}`, { method: 'DELETE' });
+      const res = await fetch(`${API_BASE_URL}/upload/${mongoId}`, { method: 'DELETE' });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || `Server error: ${res.status}`);

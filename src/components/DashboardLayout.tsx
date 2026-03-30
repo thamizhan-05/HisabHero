@@ -12,6 +12,7 @@ import { UploadHistoryPanel } from "@/components/UploadHistoryPanel";
 import { CsvMappingModal } from "@/components/CsvMappingModal";
 import { FloatingAIBot } from "@/components/FloatingAIBot";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { API_BASE_URL } from "@/lib/api";
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -58,7 +59,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
     formData.append("file", file);
 
     try {
-      const res = await fetch("http://localhost:5000/api/upload", { method: "POST", body: formData });
+      const res = await fetch(`${API_BASE_URL}/upload`, { method: "POST", body: formData });
       const data = await res.json();
 
       // [A] If server says it needs column mapping, show the modal
@@ -88,7 +89,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
     setDeleting(true);
     setConfirmDelete(false);
     try {
-      const res = await fetch('http://localhost:5000/api/upload', { method: 'DELETE' });
+      const res = await fetch(`${API_BASE_URL}/upload`, { method: 'DELETE' });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || `Server error: ${res.status}`);
@@ -133,7 +134,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
 
               {/* Export CSV */}
               <a
-                href={`http://localhost:5000/api/export?filter=${currentFilter}`}
+                href={`${API_BASE_URL}/export?filter=${currentFilter}`}
                 download
                 className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-500/10 text-blue-500 text-sm font-medium hover:bg-blue-500/20 transition-colors"
                 title="Export Filtered Data to CSV"

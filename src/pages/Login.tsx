@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { TrendingUp, Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { API_BASE_URL } from "@/lib/api";
 
 const Login = () => {
   const [searchParams] = useSearchParams();
@@ -26,10 +27,10 @@ const Login = () => {
     setLoading(true);
 
     try {
-      const endpoint = isSignUp ? '/api/auth/signup' : '/api/auth/login';
+      const endpoint = isSignUp ? '/auth/signup' : '/auth/login';
       const payload = isSignUp ? { email, password, fullName, companyName } : { email, password };
       
-      const res = await fetch(`http://127.0.0.1:5000${endpoint}`, {
+      const res = await fetch(`${API_BASE_URL}${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
